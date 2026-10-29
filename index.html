@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Tummy Pinball: Friends Inside Your Body</title>
+<style>
+  :root {
+    --ink: #2B1B17;
+    --cream: #FCEEE9;
+    --pink: #F4A2B8;
+    --yellow: #FFE082;
+    --green: #A5D86B;
+    --font: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', 'Trebuchet MS', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: #F3D6CC; font-family: var(--font); color: var(--ink); overflow: hidden; }
+
+  #app {
+    position: relative; height: 100%; max-width: 620px; margin: 0 auto;
+    display: flex; flex-direction: column; background: var(--cream);
+    border-left: 4px solid var(--ink); border-right: 4px solid var(--ink);
+  }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+    background: #FFF8F5; border-bottom: 4px solid var(--ink); flex-shrink: 0;
+  }
+  .stage-box { display: flex; flex-direction: column; align-items: flex-start; }
+  .tiny { font-size: 10px; font-weight: 900; color: #8A5A4E; text-transform: uppercase; letter-spacing: .5px; }
+  .pill {
+    background: #FFE3EA; border: 3px solid var(--ink); border-radius: 14px;
+    padding: 2px 9px; font-weight: 900; font-size: 13px; white-space: nowrap;
+  }
+  .meter { flex: 1; min-width: 0; }
+  .bar { height: 20px; border: 3px solid var(--ink); border-radius: 12px; background: #F3E1DA; overflow: hidden; }
+  #fill { height: 100%; width: 0%; background: hsl(0, 80%, 62%); border-radius: 8px; transition: width .25s ease, background-color .25s ease; }
+  .meter-label { font-size: 11px; font-weight: 900; text-align: center; margin-top: 1px; }
+  .energy {
+    background: #FFF3C4; border: 3px solid var(--ink); border-radius: 14px; padding: 3px 9px;
+    font-weight: 900; font-size: 14px; white-space: nowrap; transition: transform .12s ease;
+  }
+  .energy.bump { transform: scale(1.25); }
+  .iconbtn {
+    width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--ink); background: #fff;
+    font-family: inherit; font-weight: 900; font-size: 15px; cursor: pointer; flex-shrink: 0;
+  }
+
+  /* ---------- Canvas ---------- */
+  #stageWrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  #game { display: block; touch-action: none; }
+
+  /* ---------- Controls ---------- */
+  #controls { display: flex; gap: 8px; padding: 8px 10px; border-top: 4px solid var(--ink); background: #FFF8F5; flex-shrink: 0; }
+  .cbtn {
+    flex: 1; height: 54px; border: 3px solid var(--ink); border-radius: 18px;
+    font-family: inherit; font-weight: 900; font-size: 15px; color: var(--ink);
+    box-shadow: 0 4px 0 var(--ink); cursor: pointer; touch-action: none;
+    transition: transform .05s, box-shadow .05s, opacity .2s;
+  }
+  .cbtn.on { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  #btnL, #btnR { background: var(--pink); }
+  #btnEat { background: var(--yellow); flex: 1.35; }
+  #btnEat.dim { opacity: .45; }
+
+  /* ---------- Modals ---------- */
+  .modal {
+    position: absolute; inset: 0; background: rgba(43, 27, 23, .55);
+    display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10;
+    opacity: 0; pointer-events: none; transition: opacity .25s ease;
+  }
+  .modal.show { opacity: 1; pointer-events: auto; }
+  .card {
+    background: var(--cream); border: 4px solid var(--ink); border-radius: 26px;
+    box-shadow: 0 8px 0 var(--ink); padding: 18px; width: 100%; max-width: 420px; text-align: center;
+  }
+  .card h1 { font-size: 24px; color: #C2185B; margin-bottom: 6px; }
+  .card p { font-size: 14px; font-weight: 700; color: #6B4A40; line-height: 1.4; }
+  .foods { display: flex; gap: 10px; margin: 14px 0; }
+  .food {
+    flex: 1; background: #fff; border: 3px solid var(--ink); border-radius: 18px; padding: 8px 4px;
+    cursor: pointer; box-shadow: 0 4px 0 var(--ink); transition: transform .1s, box-shadow .1s, background .1s;
+  }
+  .food.sel { background: #FFF3C4; transform: translateY(-3px); box-shadow: 0 7px 0 var(--ink); }
+  .food canvas { width: 84px; height: 84px; display: block; margin: 0 auto; }
+  .food b { display: block; font-size: 14px; }
+  .food small { font-size: 11px; font-weight: 700; color: #8A5A4E; }
+  .big {
+    width: 100%; padding: 12px; border: 3px solid var(--ink); border-radius: 18px; background: var(--green);
+    font-family: inherit; font-size: 19px; font-weight: 900; color: var(--ink); box-shadow: 0 5px 0 var(--ink); cursor: pointer;
+  }
+  .big:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--ink); }
+  .hint { font-size: 12px; margin-top: 10px; color: #8A5A4E; font-weight: 700; }
+  .stats { display: flex; justify-content: space-around; background: #fff; border: 3px dashed #E8997A; border-radius: 16px; padding: 10px; margin: 12px 0; }
+  .stats div { display: flex; flex-direction: column; }
+  .stats b { font-size: 22px; color: #C2185B; }
+  .stats span { font-size: 11px; font-weight: 900; color: #6B4A40; text-transform: uppercase; }
+  .steps { text-align: left; font-size: 13px; font-weight: 700; line-height: 1.55; margin: 10px 0 14px 18px; color: #4A2F28; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hud">
+    <div class="stage-box">
+      <span class="tiny">Now in</span>
+      <span id="stage" class="pill">1. Mouth</span>
+    </div>
+    <div class="meter">
+      <div class="bar"><div id="fill"></div></div>
+      <div id="pct" class="meter-label">Digestion 0%</div>
+    </div>
+    <div id="energyBox" class="energy">&#9733; <span id="energy">0</span></div>
+    <button id="soundBtn" class="iconbtn" title="Sound on/off">&#9835;</button>
+    <button id="helpBtn" class="iconbtn" title="How to play">?</button>
+  </header>
+
+  <div id="stageWrap"><canvas id="game"></canvas></div>
+
+  <footer id="controls">
+    <button id="btnL" class="cbtn">&#9664; LEFT</button>
+    <button id="btnEat" class="cbtn">EAT &amp; LAUNCH</button>
+    <button id="btnR" class="cbtn">RIGHT &#9654;</button>
+  </footer>
+
+  <!-- Food select -->
+  <div id="selectModal" class="modal show">
+    <div class="card">
+      <h1>Tummy Pinball</h1>
+      <p>Pick a snack! Then help your tummy friends digest it all the way through your body.</p>
+      <div class="foods">
+        <div class="food sel" data-food="apple"><canvas id="fc-apple" width="168" height="168"></canvas><b>Apple</b><small>Crunchy fiber</small></div>
+        <div class="food" data-food="broccoli"><canvas id="fc-broccoli" width="168" height="168"></canvas><b>Broccoli</b><small>Super vitamins</small></div>
+        <div class="food" data-food="cheese"><canvas id="fc-cheese" width="168" height="168"></canvas><b>Cheese</b><small>Strong bones</small></div>
+      </div>
+      <button id="startBtn" class="big">LET'S EAT!</button>
+      <div class="hint">SPACE = eat &bull; Left/Right arrows or A/D = flippers<br>On a tablet: tap the left or right side of the tummy</div>
+    </div>
+  </div>
+
+  <!-- Victory -->
+  <div id="winModal" class="modal">
+    <div class="card">
+      <h1>Digestion Complete!</h1>
+      <p>Your body soaked up the energy and vitamins, and the leftovers were flushed away. Great job, tummy helper!</p>
+      <div class="stats">
+        <div><b id="wEnergy">0</b><span>Energy</span></div>
+        <div><b id="wTime">0s</b><span>Time</span></div>
+        <div><b id="wFood">Apple</b><span>Snack</span></div>
+      </div>
+      <button id="againBtn" class="big">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <!-- Help -->
+  <div id="helpModal" class="modal">
+    <div class="card">
+      <h1>The Food Journey</h1>
+      <ol class="steps">
+        <li><b>Mouth:</b> teeth chew food into a soft ball called a <i>bolus</i>.</li>
+        <li><b>Esophagus:</b> squeezing rings push the food down.</li>
+        <li><b>Stomach:</b> bump the Liver, Gallbladder, Pancreas and acid pockets to reach 100%.</li>
+        <li><b>Pyloric gate:</b> it only opens when food is fully churned into golden <i>chyme</i>.</li>
+        <li><b>Small intestine:</b> villi soak up vitamins and energy.</li>
+        <li><b>Large intestine:</b> soaks up water. The leftovers go to the toilet!</li>
+      </ol>
+      <button id="helpClose" class="big">GOT IT!</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* =====================================================================
+   CONSTANTS & SMALL HELPERS
+   ===================================================================== */
+const W = 720, H = 1020;
+const INK = '#2B1B17';
+const LW = 4.5;
+const TAU = Math.PI * 2;
+const FONT = "'Comic Sans MS','Chalkboard SE','Marker Felt','Trebuchet MS',sans-serif";
+
+const GRAVITY = 0.20;      // per frame @60fps
+const MAX_SPEED = 16;      // px per frame
+const SUB_STEPS = 8;
+const BUMPER_E = 0.72;     // organ bumper restitution
+const WALL_E = 0.5;
+
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[(Math.random() * arr.length) | 0];
+
+function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function mix(a, b, t) {
+  const A = hexToRgb(a), B = hexToRgb(b);
+  return '#' + A.map((v, i) => Math.round(lerp(v, B[i], clamp(t, 0, 1))).toString(16).padStart(2, '0')).join('');
+}
+const darken = (h, t) => mix(h, '#000000', t);
+
+/* =====================================================================
+   PROCEDURAL WEB AUDIO
+   ===================================================================== */
+const Sound = {
+  ctx: null, master: null, nbuf: null, muted: false,
+  init() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.5;
+      this.master.connect(this.ctx.destination);
+    }
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+  },
+  ok() { if (this.muted) return false; this.init(); return !!this.ctx; },
+  tone(f0, f1, dur, type = 'sine', vol = 0.3, delay = 0) {
+    if (!this.ok()) return;
+    const c = this.ctx, t = c.currentTime + delay;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t); o.stop(t + dur + 0.03);
+  },
+  noise(dur, vol, f0, f1, delay = 0) {
+    if (!this.ok()) return;
+    const c = this.ctx;
+    if (!this.nbuf) {
+      const len = Math.floor(c.sampleRate * 1.6);
+      this.nbuf = c.createBuffer(1, len, c.sampleRate);
+      const d = this.nbuf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const t = c.currentTime + delay;
+    const s = c.createBufferSource(); s.buffer = this.nbuf;
+    const f = c.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.1;
+    f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(this.master);
+    s.start(t); s.stop(t + dur + 0.05);
+  },
+  chomp()   { this.noise(0.09, 0.3, 1800, 500); this.tone(190, 90, 0.08, 'square', 0.1); },
+  gulp()    { this.tone(320, 110, 0.2, 'sine', 0.4); this.tone(520, 900, 0.12, 'sine', 0.18, 0.16); },
+  boing()   { this.tone(150, 620, 0.26, 'sine', 0.35); },
+  flip()    { this.tone(230, 90, 0.07, 'square', 0.1); },
+  kick()    { this.tone(300, 700, 0.09, 'triangle', 0.2); },
+  pop(f)    { this.tone(f, f * 2.1, 0.13, 'sine', 0.32); },
+  squish()  { this.tone(280, 140, 0.16, 'triangle', 0.28); this.noise(0.12, 0.12, 900, 300); },
+  bubbles() { for (let i = 0; i < 4; i++) { const r = rand(220, 400); this.tone(r, r * 2.2, 0.07, 'triangle', 0.16, i * 0.05); } },
+  bounceBack() { this.tone(120, 480, 0.16, 'sine', 0.4); this.tone(480, 260, 0.18, 'sine', 0.25, 0.15); },
+  fanfare() { [523, 659, 784, 1047].forEach((f, i) => this.tone(f, f, 0.3, 'triangle', 0.25, i * 0.11)); },
+  chime(i)  { const s = [784, 880, 988, 1175, 1319, 1568]; const f = s[i % s.length]; this.tone(f, f, 0.32, 'triangle', 0.25); this.tone(f * 2, f * 2, 0.2, 'sine', 0.07); },
+  drip()    { this.tone(900, 1700, 0.08, 'sine', 0.15); },
+  flush()   {
+    this.noise(1.5, 0.4, 2600, 180);
+    this.tone(220, 60, 1.2, 'sine', 0.18);
+    [784, 988, 1175, 1568].forEach((f, i) => this.tone(f, f, 0.32, 'triangle', 0.22, 0.6 + i * 0.12));
+  }
+};
+
+/* =====================================================================
+   KAWAII DRAWING TOOLKIT
+   ===================================================================== */
+function ell(c, x, y, rx, ry, rot = 0) { c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, TAU); }
+function circ(c, x, y, r) { c.beginPath(); c.arc(x, y, r, 0, TAU); }
+
+// Layer 1 + 2: base fill with an inner cel-shadow along the bottom/right contour
+function shadeFill(c, p, base, shadow, off = 10) {
+  c.save();
+  c.clip(p);
+  c.fillStyle = shadow; c.fill(p);
+  c.translate(-off * 0.55, -off);
+  c.fillStyle = base; c.fill(p);
+  c.restore();
+}
+function outline(c, p, lw = LW) {
+  c.save();
+  c.lineWidth = lw; c.strokeStyle = INK; c.lineJoin = 'round'; c.lineCap = 'round';
+  c.stroke(p);
+  c.restore();
+}
+// Layer 3: one big white bean + one small white dot
+function gloss(c, x, y, w, rot = -0.6, a = 0.85) {
+  c.save();
+  c.fillStyle = `rgba(255,255,255,${a})`;
+  ell(c, x, y, w, w * 0.42, rot); c.fill();
+  circ(c, x + Math.cos(rot) * w * 1.45, y + Math.sin(rot) * w * 1.45, Math.max(1.5, w * 0.24)); c.fill();
+  c.restore();
+}
+// Kawaii face: solid dark eyes w/ white dot, rosy cheeks, mouth on the eye line
+function face(c, x, y, s, o = {}) {
+  const ex = 9 * s, er = clamp(4 * s, 3.5, 5);
+  c.save();
+  // cheeks
+  c.fillStyle = 'rgba(242,139,130,0.9)';
+  const chx = ex + er * 0.9, chy = er + 2.4 * s;
+  ell(c, x - chx, y + chy, 4.8 * s + 1, 2.8 * s + 0.8); c.fill();
+  ell(c, x + chx, y + chy, 4.8 * s + 1, 2.8 * s + 0.8); c.fill();
+  // eyes
+  if (o.sleepy) {
+    c.strokeStyle = INK; c.lineCap = 'round'; c.lineWidth = Math.max(2, 2.3 * s);
+    for (const sx of [-ex, ex]) { c.beginPath(); c.arc(x + sx, y + er * 0.4, er, Math.PI * 1.15, Math.PI * 1.85); c.stroke(); }
+  } else {
+    for (const sx of [-ex, ex]) {
+      c.fillStyle = INK; circ(c, x + sx, y, er); c.fill();
+      c.fillStyle = '#FFFFFF'; circ(c, x + sx - er * 0.38, y - er * 0.38, 1.5); c.fill();
+    }
+  }
+  // mouth
+  const mw = Math.max(2.8, 3.4 * s);
+  if (o.open) {
+    const d = new Path2D();
+    d.moveTo(x + mw, y); d.arc(x, y, mw, 0, Math.PI); d.closePath();
+    c.fillStyle = '#8D2323'; c.fill(d);
+    c.save(); c.clip(d);
+    c.fillStyle = '#FF8A80'; ell(c, x, y + mw * 0.95, mw * 0.62, mw * 0.45); c.fill();
+    c.restore();
+    c.lineWidth = Math.max(1.8, 1.6 * s); c.strokeStyle = INK; c.lineJoin = 'round'; c.stroke(d);
+  } else {
+    c.strokeStyle = INK; c.lineCap = 'round'; c.lineWidth = Math.max(2, 2 * s);
+    c.beginPath(); c.arc(x, y - mw * 0.15, mw * 0.9, 0.18 * Math.PI, 0.82 * Math.PI); c.stroke();
+  }
+  c.restore();
+}
+function starPath(x, y, R, r, rot) {
+  const p = new Path2D();
+  for (let i = 0; i < 10; i++) {
+    const a = rot - Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r : R;
+    const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+    i ? p.lineTo(px, py) : p.moveTo(px, py);
+  }
+  p.closePath();
+  return p;
+}
+function roundPoly(pts, r) {
+  const p = new Path2D(), n = pts.length;
+  p.moveTo((pts[n - 1][0] + pts[0][0]) / 2, (pts[n - 1][1] + pts[0][1]) / 2);
+  for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; p.arcTo(a[0], a[1], b[0], b[1], r); }
+  p.closePath();
+  return p;
+}
+function label(c, t, x, y, rot = 0) {
+  c.save();
+  c.translate(x, y); c.rotate(rot);
+  c.font = `bold 13px ${FONT}`;
+  const w = c.measureText(t).width + 16;
+  const p = new Path2D(); p.roundRect(-w / 2, -11, w, 22, 11);
+  c.fillStyle = 'rgba(255,250,246,0.93)'; c.fill(p);
+  outline(c, p, 2.5);
+  c.fillStyle = INK; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(t, 0, 1);
+  c.restore();
+}
+
+/* ---------- Kawaii food characters ---------- */
+function drawFood(c, type, x, y, R, o = {}) {
+  c.save();
+  c.translate(x, y);
+  if (type === 'apple') {
+    c.lineCap = 'round';
+    c.beginPath(); c.moveTo(0, -R * 0.55); c.quadraticCurveTo(R * 0.05, -R * 0.95, R * 0.2, -R * 1.1);
+    c.strokeStyle = INK; c.lineWidth = 8; c.stroke();
+    c.strokeStyle = '#8D5A3B'; c.lineWidth = 3.5; c.stroke();
+    const leaf = new Path2D(); leaf.ellipse(R * 0.48, -R * 0.95, R * 0.34, R * 0.17, -0.5, 0, TAU);
+    shadeFill(c, leaf, '#9CCC65', '#6E9E3A', 3); outline(c, leaf, 3);
+    const p = new Path2D();
+    p.moveTo(0, -R * 0.62);
+    p.bezierCurveTo(R * 0.5, -R * 1.05, R * 1.15, -R * 0.55, R * 0.95, R * 0.2);
+    p.bezierCurveTo(R * 0.8, R * 0.85, R * 0.3, R * 1.05, 0, R * 0.85);
+    p.bezierCurveTo(-R * 0.3, R * 1.05, -R * 0.8, R * 0.85, -R * 0.95, R * 0.2);
+    p.bezierCurveTo(-R * 1.15, -R * 0.55, -R * 0.5, -R * 1.05, 0, -R * 0.62);
+    p.closePath();
+    shadeFill(c, p, '#EF5350', '#C62828', R * 0.28);
+    gloss(c, -R * 0.5, -R * 0.28, R * 0.24, -1.0);
+    outline(c, p);
+    face(c, 0, R * 0.18, R / 22, o);
+  } else if (type === 'broccoli') {
+    const st = new Path2D();
+    st.moveTo(-R * 0.32, 0); st.lineTo(R * 0.32, 0); st.lineTo(R * 0.24, R * 0.92);
+    st.quadraticCurveTo(0, R * 1.05, -R * 0.24, R * 0.92); st.closePath();
+    shadeFill(c, st, '#D4E9A8', '#A9CC6E', 4); outline(c, st);
+    const cr = new Path2D();
+    for (const [cx, cy, r] of [[-0.52, -0.2, 0.42], [0.52, -0.2, 0.42], [0, -0.55, 0.5], [-0.24, 0.02, 0.4], [0.24, 0.02, 0.4]]) {
+      cr.moveTo(cx * R + r * R, cy * R); cr.arc(cx * R, cy * R, r * R, 0, TAU);
+    }
+    c.save(); c.lineWidth = LW * 2; c.strokeStyle = INK; c.lineJoin = 'round'; c.stroke(cr); c.restore();
+    shadeFill(c, cr, '#6CC070', '#3E8E41', R * 0.22);
+    c.fillStyle = 'rgba(46,125,50,0.5)';
+    for (const [dx, dy] of [[-0.62, -0.35], [0.58, -0.42], [-0.1, -0.82], [0.32, -0.72], [-0.38, -0.62]]) { circ(c, dx * R, dy * R, R * 0.07); c.fill(); }
+    gloss(c, -R * 0.55, -R * 0.42, R * 0.2, -0.9);
+    face(c, 0, -R * 0.18, R / 24, o);
+  } else {
+    const p = roundPoly([[-R, R * 0.62], [R * 0.98, R * 0.62], [R * 0.98, -R * 0.18], [-R * 0.55, -R * 0.78]], R * 0.22);
+    shadeFill(c, p, '#FFD54F', '#F2A93B', R * 0.25);
+    c.save(); c.clip(p);
+    for (const [hx, hy, hr] of [[-0.66, 0.32, 0.14], [0.74, 0.32, 0.12], [0.58, -0.02, 0.09], [-0.32, -0.36, 0.1]]) {
+      c.fillStyle = '#E39A2E'; circ(c, hx * R, hy * R, hr * R); c.fill();
+      c.fillStyle = '#F7C04A'; circ(c, hx * R - 1, hy * R - 1, hr * R * 0.6); c.fill();
+    }
+    c.restore();
+    gloss(c, -R * 0.3, -R * 0.38, R * 0.2, -0.75);
+    outline(c, p);
+    face(c, R * 0.12, R * 0.22, R / 23, o);
+  }
+  c.restore();
+}
+
+/* ---------- Bolus / Chyme / Waste ball ---------- */
+function drawBolus(c, x, y, r, col, o = {}) {
+  c.save();
+  c.translate(x, y);
+  const p = new Path2D();
+  const wob = o.wob || 0;
+  for (let i = 0; i <= 28; i++) {
+    const a = i / 28 * TAU;
+    const rr = r * (1 + 0.065 * Math.sin(a * 5 + wob));
+    i ? p.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : p.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+  }
+  p.closePath();
+  shadeFill(c, p, col, darken(col, 0.22), r * 0.35);
+  if (o.waste) {
+    c.strokeStyle = darken(col, 0.3); c.lineWidth = 2.2; c.lineCap = 'round';
+    c.beginPath(); c.arc(0, -r * 0.1, r * 0.75, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
+    c.beginPath(); c.arc(0, r * 0.25, r * 0.85, Math.PI * 1.15, Math.PI * 1.85); c.stroke();
+  } else {
+    c.fillStyle = darken(col, 0.18);
+    circ(c, r * 0.5, r * 0.45, 1.8); c.fill();
+    circ(c, -r * 0.55, r * 0.5, 1.5); c.fill();
+    circ(c, r * 0.62, -r * 0.2, 1.4); c.fill();
+  }
+  gloss(c, -r * 0.42, -r * 0.48, r * 0.3, -0.7);
+  outline(c, p, 3.5);
+  face(c, 0, r * 0.12, r / 23, { open: o.open });
+  c.restore();
+}
+
+/* =====================================================================
+   GEOMETRY / LAYOUT
+   ===================================================================== */
+function catmull(pts, seg) {
+  const out = [], n = pts.length;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = pts[Math.max(i - 1, 0)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(i + 2, n - 1)];
+    for (let j = 0; j < seg; j++) {
+      const t = j / seg, t2 = t * t, t3 = t2 * t;
+      const f = k => 0.5 * ((2 * p1[k]) + (-p0[k] + p2[k]) * t + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2 + (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t3);
+      out.push([f(0), f(1)]);
+    }
+  }
+  out.push(pts[n - 1].slice());
+  return out;
+}
+function cubic(p0, p1, p2, p3, n) {
+  const o = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, u = 1 - t;
+    o.push([u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
+            u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1]]);
+  }
+  return o;
+}
+function makePath(pts) {
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  return { pts, cum, len: cum[cum.length - 1] };
+}
+function pathAt(P, d) {
+  d = clamp(d, 0, P.len);
+  let i = 1;
+  while (i < P.cum.length - 1 && P.cum[i] < d) i++;
+  const a = P.pts[i - 1], b = P.pts[i];
+  const seg = (P.cum[i] - P.cum[i - 1]) || 1;
+  const t = (d - P.cum[i - 1]) / seg;
+  return { x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t, a: Math.atan2(b[1] - a[1], b[0] - a[0]) };
+}
+function path2d(pts, close) {
+  const p = new Path2D();
+  p.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) p.lineTo(pts[i][0], pts[i][1]);
+  if (close) p.closePath();
+  return p;
+}
+
+/* ---------- Stomach boundary (the playfield walls ARE the stomach) ---------- */
+const R_PTS = [[378, 168], [430, 178], [495, 205], [548, 255], [580, 325], [590, 410], [578, 500], [548, 575], [500, 628], [455, 655]];
+const L_PTS = [[185, 655], [140, 628], [92, 575], [62, 500], [50, 410], [58, 320], [90, 240], [145, 188], [210, 160], [270, 155], [322, 168]];
+const GATE_Y = 714;
+const POLY = [...catmull(R_PTS, 8), [448, 668], [372, GATE_Y], [268, GATE_Y], [192, 668], ...catmull(L_PTS, 8)];
+const WALLS = [];
+for (let i = 0; i < POLY.length - 1; i++) WALLS.push([POLY[i][0], POLY[i][1], POLY[i + 1][0], POLY[i + 1][1]]);
+const CARDIA = [322, 168, 378, 168]; // one-way valve at the stomach entrance
+const stomachFill = path2d(POLY, true);
+const stomachLine = path2d(POLY, false);
+
+/* ---------- Esophagus (straight chute + smooth arch into the stomach) ---------- */
+const ESO_BOTTOM = 470, ESO_TOP = 150;
+const ESO = makePath([[660, ESO_BOTTOM], [660, ESO_TOP], ...cubic([660, ESO_TOP], [660, 30], [350, 30], [350, 178], 44).slice(1)]);
+const ESO_ARCH = ESO_BOTTOM - ESO_TOP;
+const esoP = path2d(ESO.pts, false);
+
+/* ---------- Intestine ride paths ---------- */
+const SI = makePath(catmull([[320, 700], [320, 750], [318, 790], [290, 806], [235, 808], [202, 828], [232, 851], [330, 852], [428, 852], [460, 872], [428, 893], [330, 894], [232, 894], [180, 900], [142, 912]], 8));
+const LI = makePath(catmull([[142, 912], [128, 880], [126, 820], [132, 778], [172, 760], [330, 758], [500, 760], [552, 778], [562, 830], [560, 890], [546, 928], [480, 952], [400, 960], [330, 962]], 8));
+const siP = path2d(SI.pts, false);
+const LI_POUCHES = [];
+for (let d = 0; d <= LI.len; d += 24) LI_POUCHES.push(pathAt(LI, d));
+const TOILET = { x: 640, y: 948 };
+
+/* ---------- Organ bumper shapes ---------- */
+const liverP = new Path2D();
+liverP.moveTo(128, 230);
+liverP.bezierCurveTo(150, 204, 218, 204, 242, 222);
+liverP.bezierCurveTo(258, 234, 252, 250, 232, 253);
+liverP.bezierCurveTo(214, 256, 206, 262, 200, 274);
+liverP.bezierCurveTo(190, 294, 150, 300, 130, 284);
+liverP.bezierCurveTo(110, 268, 110, 244, 128, 230);
+liverP.closePath();
+
+const gallP = new Path2D();
+gallP.moveTo(323, 212);
+gallP.bezierCurveTo(318, 222, 304, 230, 306, 250);
+gallP.bezierCurveTo(308, 274, 352, 274, 354, 250);
+gallP.bezierCurveTo(356, 230, 342, 222, 337, 212);
+gallP.bezierCurveTo(334, 204, 326, 204, 323, 212);
+gallP.closePath();
+
+const PANC_A = [416, 304], PANC_B = [502, 276];
+function buildPancreas() {
+  const A = PANC_A, B = PANC_B;
+  const dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy);
+  const ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
+  const w = u => 23 - 9 * u;
+  const N = 24, top = [], bot = [];
+  for (let i = 0; i <= N; i++) {
+    const u = i / N, ww = w(u) * (1 + 0.08 * Math.sin(u * Math.PI * 10));
+    const cx = A[0] + dx * u, cy = A[1] + dy * u;
+    top.push([cx + nx * ww, cy + ny * ww]);
+    bot.push([cx - nx * ww, cy - ny * ww]);
+  }
+  const an = Math.atan2(ny, nx);
+  const p = new Path2D();
+  p.moveTo(top[0][0], top[0][1]);
+  for (const q of top) p.lineTo(q[0], q[1]);
+  p.arc(B[0], B[1], w(1), an, an - Math.PI, true);
+  for (let i = N; i >= 0; i--) p.lineTo(bot[i][0], bot[i][1]);
+  p.arc(A[0], A[1], w(0), an + Math.PI, an, true);
+  p.closePath();
+  return p;
+}
+const pancP = buildPancreas();
+
+const ORGANS = [
+  { name: 'Liver', path: liverP, base: '#B86B63', shadow: '#94504A', cx: 180, cy: 252,
+    shapes: [{ t: 'c', x: 162, y: 256, r: 36 }, { t: 'c', x: 224, y: 236, r: 20 }],
+    add: 12, msg: 'The Liver makes bile! +12%', bubble: '#F6E0DC',
+    face: { x: 165, y: 258, s: 1.3 }, gl: { x: 142, y: 230, w: 12, rot: -0.5 },
+    fx: 'bile', pitch: 520, squash: 0, cd: 0 },
+  { name: 'Gallbladder', path: gallP, base: '#9CCC65', shadow: '#76A63F', cx: 330, cy: 246,
+    shapes: [{ t: 'c', x: 330, y: 246, r: 26 }],
+    add: 15, msg: 'Gallbladder squirts bile! +15%', bubble: '#E9F6D8',
+    face: { x: 330, y: 252, s: 1.0, open: true }, gl: { x: 318, y: 236, w: 8, rot: -1.0 },
+    fx: 'squirt', pitch: 700, squash: 0, cd: 0 },
+  { name: 'Pancreas', path: pancP, base: '#FFEE58', shadow: '#E6C53A', cx: 459, cy: 290,
+    shapes: [{ t: 's', ax: PANC_A[0], ay: PANC_A[1], bx: PANC_B[0], by: PANC_B[1], r: 19 }],
+    add: 15, msg: 'Pancreas sends enzymes! +15%', bubble: '#FFF8C4',
+    face: { x: 455, y: 291, s: 1.0, sleepy: true, rot: Math.atan2(PANC_B[1] - PANC_A[1], PANC_B[0] - PANC_A[0]) },
+    gl: { x: 430, y: 289, w: 8, rot: -0.9 },
+    fx: 'stars', pitch: 880, squash: 0, cd: 0 }
+];
+
+const PADS = [
+  { x: 105, y: 430, side: 1, cd: 0, flash: 0 },
+  { x: 535, y: 430, side: -1, cd: 0, flash: 0 }
+];
+
+const LABELS = [
+  ['Mouth', 205, 140, 0], ['Esophagus', 660, 310, -Math.PI / 2], ['Stomach', 320, 548, 0],
+  ['Liver', 172, 312, 0], ['Gallbladder', 330, 290, 0], ['Pancreas', 462, 336, 0],
+  ['Small Intestine', 405, 814, 0], ['Large Intestine', 228, 760, 0]
+];
+
+const BOLUS = { apple: '#E98A6F', broccoli: '#9DC46E', cheese: '#F2C25A' };
+const CRUMBS = { apple: ['#EF5350', '#FFF3E0', '#9CCC65'], broccoli: ['#6CC070', '#D4E9A8'], cheese: ['#FFD54F', '#F2A93B'] };
+const GOLD = '#FFC83D', BROWN = '#8D5A3B';
+const FOOD_NAMES = { apple: 'Apple', broccoli: 'Broccoli', cheese: 'Cheese' };
+const STAGES = ['', '1. Mouth', '2. Esophagus', '3. Stomach', '4. Small Intestine', '5. Large Intestine', 'All Done!'];
+
+/* =====================================================================
+   FLIPPERS (Pyloric sphincter muscles)
+   ===================================================================== */
+class Flipper {
+  constructor(x, y, len, restDeg, upDeg, side) {
+    this.x = x; this.y = y; this.len = len;
+    this.rest = restDeg * Math.PI / 180;
+    this.up = upDeg * Math.PI / 180;
+    this.angle = this.rest; this.av = 0;
+    this.side = side; this.pressed = false; this.swing = 0;
+    this.r0 = 14; this.r1 = 9;
+  }
+  setPressed(p) {
+    if (p && !this.pressed) { this.swing = 0.18; Sound.flip(); }
+    this.pressed = p;
+  }
+  step(sdt) {
+    const target = this.pressed ? this.up : this.rest;
+    const maxStep = (this.pressed ? 20 : 11) * sdt;
+    const prev = this.angle, diff = target - this.angle;
+    this.angle = Math.abs(diff) <= maxStep ? target : this.angle + Math.sign(diff) * maxStep;
+    this.av = (this.angle - prev) / sdt;
+    if (this.swing > 0) this.swing -= sdt;
+  }
+  atUp() { return this.pressed && Math.abs(this.angle - this.up) < 0.03; }
+  collide(b) {
+    const tx = this.x + Math.cos(this.angle) * this.len, ty = this.y + Math.sin(this.angle) * this.len;
+    const dx = tx - this.x, dy = ty - this.y, L2 = dx * dx + dy * dy;
+    const t = clamp(((b.x - this.x) * dx + (b.y - this.y) * dy) / L2, 0, 1);
+    const cx = this.x + dx * t, cy = this.y + dy * t;
+    const rr = this.r0 + (this.r1 - this.r0) * t;
+    let nx = b.x - cx, ny = b.y - cy;
+    const d = Math.hypot(nx, ny), minD = b.r + rr;
+    if (d >= minD) return;
+    if (d < 1e-6) { nx = 0; ny = -1; } else { nx /= d; ny /= d; }
+    b.x = cx + nx * minD; b.y = cy + ny * minD;
+
+    const active = this.pressed && (this.swing > 0 || this.atUp());
+    if (active && ny < 0.2) {
+      // Guaranteed energetic flip
+      const k = this.side === 'L' ? 1 : -1;
+      b.vy = -14.5 - Math.random() * 2;
+      b.vx = k * (1.5 + (1 - t) * 4.5) + (Math.random() - 0.5) * 1.5;
+      Sound.kick();
+      emit(b.x, b.y + 8, 6, { colors: ['#FFFFFF', '#F4A2B8'], speed: 2.5, size: 3 });
+      return;
+    }
+    // Passive bounce relative to flipper surface velocity (px/frame)
+    const dist = t * this.len;
+    const svx = -this.av * dist * Math.sin(this.angle) / 60;
+    const svy = this.av * dist * Math.cos(this.angle) / 60;
+    const rvx = b.vx - svx, rvy = b.vy - svy;
+    const vn = rvx * nx + rvy * ny;
+    if (vn < 0) { b.vx -= 1.45 * vn * nx; b.vy -= 1.45 * vn * ny; }
+  }
+  draw(c) {
+    c.save();
+    c.translate(this.x, this.y);
+    c.rotate(this.angle);
+    if (this.side === 'R') c.scale(1, -1); // keep cel-shadow on the underside
+    const L = this.len, r0 = this.r0, r1 = this.r1;
+    const p = new Path2D();
+    p.arc(0, 0, r0, Math.PI / 2, Math.PI * 1.5);
+    p.lineTo(L, -r1);
+    p.arc(L, 0, r1, -Math.PI / 2, Math.PI / 2);
+    p.closePath();
+    shadeFill(c, p, '#D85A6C', '#AE3B4E', 7);
+    c.save(); c.clip(p);
+    c.strokeStyle = 'rgba(255,190,200,0.75)'; c.lineWidth = 2; c.lineCap = 'round';
+    for (const yy of [-2, 4]) { c.beginPath(); c.moveTo(14, yy); c.lineTo(L - 8, yy * 0.6); c.stroke(); }
+    c.restore();
+    c.fillStyle = 'rgba(255,255,255,0.85)';
+    ell(c, 22, -7, 11, 3); c.fill();
+    circ(c, 40, -6.5, 2); c.fill();
+    outline(c, p);
+    const cap = new Path2D(); cap.arc(0, 0, 6, 0, TAU);
+    c.fillStyle = '#F6B9C3'; c.fill(cap); outline(c, cap, 3);
+    c.restore();
+  }
+}
+const FL = new Flipper(200, 660, 88, 24, -28, 'L');
+const FR = new Flipper(440, 660, 88, 156, 208, 'R');
+
+/* =====================================================================
+   GAME STATE
+   ===================================================================== */
+const S = {
+  phase: 'select', food: 'apple', dig: 0, energy: 0, gateOpen: false,
+  time: 0, eatT: 0, chew: 0, startTime: 0, gateCD: 0, stuck: 0,
+  jumpT: 0, jx: 0, jy: 0, flushT: 0, dropT: 0, won: false
+};
+const ball = { x: 660, y: 380, vx: 0, vy: 0, r: 15, inPlay: false, pathD: 0, esoD: 0, archSpeed: 10, scale: 1, spin: 0 };
+const safe = { x: 350, y: 182 };
+let STARS = [];
+
+/* =====================================================================
+   PARTICLES & CALLOUTS
+   ===================================================================== */
+const parts = [];
+function emit(x, y, n, o = {}) {
+  for (let i = 0; i < n; i++) {
+    if (parts.length > 450) parts.shift();
+    const a = o.angle != null ? o.angle + (Math.random() - 0.5) * (o.spread ?? 1) : Math.random() * TAU;
+    const sp = (o.speed || 3) * (0.5 + Math.random() * 0.7);
+    parts.push({
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      r: (o.size || 5) * (0.6 + Math.random() * 0.7),
+      color: pick(o.colors || ['#FFE14D']), life: 1,
+      decay: o.decay || (0.018 + Math.random() * 0.015),
+      type: o.type || 'circle', g: o.gravity ?? 0.12,
+      rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 0.3
+    });
+  }
+}
+function emitFly(x, y) {
+  parts.push({ x, y, vx: 0, vy: 0, r: 8, color: '#FFE14D', life: 1, decay: 0, type: 'fly', g: 0, rot: 0, vr: 0.2, tx: 600, ty: 12 });
+}
+function updateParticles(f) {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    if (p.type === 'fly') {
+      p.x += (p.tx - p.x) * 0.09 * f; p.y += (p.ty - p.y) * 0.09 * f; p.rot += p.vr * f;
+      if (Math.hypot(p.tx - p.x, p.ty - p.y) < 12) parts.splice(i, 1);
+      continue;
+    }
+    if (p.type === 'bubble') { p.vy -= 0.05 * f; p.vx += (Math.random() - 0.5) * 0.2; }
+    else p.vy += p.g * f;
+    if (p.type === 'confetti') p.vx *= 0.98;
+    p.x += p.vx * f; p.y += p.vy * f; p.rot += p.vr * f;
+    p.life -= p.decay * f;
+    if (p.life <= 0) parts.splice(i, 1);
+  }
+}
+function drawParticles(c) {
+  for (const p of parts) {
+    c.save();
+    c.globalAlpha = clamp(p.life, 0, 1);
+    c.translate(p.x, p.y);
+    c.fillStyle = p.color; c.strokeStyle = INK; c.lineWidth = 1.5; c.lineJoin = 'round';
+    if (p.type === 'star' || p.type === 'fly') {
+      const sp = starPath(0, 0, p.r * 1.5, p.r * 0.7, p.rot);
+      c.fill(sp); c.stroke(sp);
+    } else if (p.type === 'drop') {
+      c.rotate(Math.atan2(p.vy, p.vx) + Math.PI / 2);
+      const r = p.r;
+      c.beginPath(); c.moveTo(0, -r * 1.7);
+      c.bezierCurveTo(r * 1.1, -r * 0.3, r * 1.1, r, 0, r);
+      c.bezierCurveTo(-r * 1.1, r, -r * 1.1, -r * 0.3, 0, -r * 1.7);
+      c.fill(); c.stroke();
+    } else if (p.type === 'confetti') {
+      c.rotate(p.rot); c.fillRect(-p.r, -p.r * 0.5, p.r * 2, p.r); c.strokeRect(-p.r, -p.r * 0.5, p.r * 2, p.r);
+    } else if (p.type === 'bubble') {
+      circ(c, 0, 0, p.r); c.fill(); c.stroke();
+      c.fillStyle = '#FFFFFF'; circ(c, -p.r * 0.35, -p.r * 0.35, p.r * 0.28); c.fill();
+    } else {
+      circ(c, 0, 0, p.r); c.fill(); c.stroke();
+    }
+    c.restore();
+  }
+}
+
+const callouts = [];
+function callout(text, x, y, bg = '#FFF8E1') {
+  if (callouts.some(k => k.text === text && k.life > 0.35)) return;
+  callouts.push({ text, x, y, bg, life: 1, s: 0.6 });
+  if (callouts.length > 4) callouts.shift();
+}
+function updateCallouts(f) {
+  for (let i = callouts.length - 1; i >= 0; i--) {
+    const k = callouts[i];
+    k.y -= 0.55 * f; k.life -= 0.0075 * f;
+    if (k.s < 1) k.s = Math.min(1, k.s + 0.06 * f);
+    if (k.life <= 0) callouts.splice(i, 1);
+  }
+}
+function drawCallouts(c) {
+  c.save();
+  c.font = `bold 18px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  for (const k of callouts) {
+    const w = c.measureText(k.text).width + 28;
+    const x = clamp(k.x, w / 2 + 8, W - w / 2 - 8);
+    c.save();
+    c.globalAlpha = clamp(k.life * 1.6, 0, 1);
+    c.translate(x, k.y); c.scale(k.s, k.s);
+    const p = new Path2D(); p.roundRect(-w / 2, -18, w, 36, 18);
+    c.fillStyle = k.bg; c.fill(p); outline(c, p, 3.5);
+    c.fillStyle = INK; c.fillText(k.text, 0, 1);
+    c.restore();
+  }
+  c.restore();
+}
+
+/* =====================================================================
+   HUD
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const hud = { stage: $('stage'), fill: $('fill'), pct: $('pct'), energy: $('energy'), energyBox: $('energyBox') };
+function setStage(n) { hud.stage.textContent = STAGES[n]; }
+function hudMeter() {
+  hud.fill.style.width = S.dig + '%';
+  hud.fill.style.backgroundColor = `hsl(${Math.round(S.dig * 1.2)}, 78%, 58%)`;
+  hud.pct.textContent = `Digestion ${Math.round(S.dig)}%`;
+}
+function hudEnergy() {
+  hud.energy.textContent = S.energy;
+  hud.energyBox.classList.add('bump');
+  setTimeout(() => hud.energyBox.classList.remove('bump'), 160);
+}
+
+/* =====================================================================
+   GAME FLOW
+   ===================================================================== */
+function resetGame(food) {
+  S.food = food; S.phase = 'ready'; S.dig = 0; S.energy = 0; S.gateOpen = false;
+  S.eatT = 0; S.chew = 0; S.gateCD = 0; S.stuck = 0; S.won = false; S.flushT = 0;
+  S.startTime = performance.now();
+  ball.inPlay = false; ball.scale = 1; ball.spin = 0; ball.vx = ball.vy = 0;
+  STARS = [0.22, 0.38, 0.54, 0.70, 0.86].map(fr => { const d = SI.len * fr, p = pathAt(SI, d); return { d, x: p.x, y: p.y, got: false }; });
+  ORGANS.forEach(o => { o.squash = 0; o.cd = 0; });
+  PADS.forEach(p => { p.cd = 0; p.flash = 0; });
+  parts.length = 0; callouts.length = 0;
+  setStage(1); hudMeter(); hud.energy.textContent = '0';
+}
+
+function triggerEat() {
+  if (S.phase !== 'ready') return;
+  Sound.init();
+  S.phase = 'eating'; S.eatT = 0; S.chew = 0;
+  Sound.tone(500, 800, 0.1, 'sine', 0.18);
+}
+
+function launch() {
+  ball.inPlay = true;
+  ball.x = 660; ball.y = 380; ball.vx = -2; ball.vy = -22;
+  ball.esoD = ESO_BOTTOM - ball.y;
+  S.phase = 'chute';
+  setStage(2);
+  Sound.gulp(); Sound.boing();
+  emit(205, 82, 10, { colors: CRUMBS[S.food], speed: 3, size: 3.5 });
+  emit(660, 400, 10, { colors: ['#FFFFFF', '#F4A2B8', '#E58B73'], speed: 3, size: 4 });
+  callout('Gulp! The esophagus squeezes food down!', 470, 430, '#FDE3DA');
+}
+
+function enterStomach() {
+  S.phase = 'play';
+  ball.x = 350; ball.y = 182; ball.vx = rand(-1, 1); ball.vy = 4;
+  safe.x = ball.x; safe.y = ball.y;
+  setStage(3);
+  Sound.pop(480);
+  callout("Welcome to the Stomach! Let's churn!", 330, 380, '#FDE3DA');
+}
+
+function addDigestion(n) {
+  if (S.gateOpen) return;
+  S.dig = Math.min(100, S.dig + n);
+  hudMeter();
+  if (S.dig >= 100) openGate();
+}
+
+function openGate() {
+  S.gateOpen = true;
+  Sound.fanfare();
+  callout('Yay! Golden Chyme! The gate is open!', 320, 610, '#E6F6D0');
+  emit(320, 708, 26, { type: 'star', colors: ['#A5D86B', '#FFE14D', '#FFFFFF'], speed: 5, size: 5 });
+}
+
+function startSmallIntestine() {
+  S.phase = 'si';
+  ball.pathD = 0;
+  setStage(4);
+  Sound.pop(620);
+  callout('Villi soak up energy from food!', 330, 690, '#FFF8C4');
+}
+
+function hitOrgan(o) {
+  o.squash = 0.3;
+  if (o.cd > 0) return;
+  o.cd = 0.35;
+  addDigestion(o.add);
+  callout(o.msg, o.cx, o.cy - 58, o.bubble);
+  Sound.pop(o.pitch);
+  if (o.fx === 'bile') emit(ball.x, ball.y, 12, { type: 'drop', colors: ['#7CB342', '#9CCC65', '#558B2F'], speed: 3.5, size: 4 });
+  else if (o.fx === 'squirt') { emit(o.cx, o.cy - 30, 16, { type: 'drop', colors: ['#B2FF59', '#76FF03', '#CCFF90'], speed: 6, size: 4, angle: -Math.PI / 2, spread: 1.3 }); Sound.squish(); }
+  else emit(ball.x, ball.y, 12, { type: 'star', colors: ['#FFE14D', '#FFF59D', '#FFB300'], speed: 4, size: 4.5 });
+}
+
+function showWin() {
+  const secs = Math.round((performance.now() - S.startTime) / 1000);
+  $('wEnergy').textContent = S.energy;
+  $('wTime').textContent = secs + 's';
+  $('wFood').textContent = FOOD_NAMES[S.food];
+  $('winModal').classList.add('show');
+}
+
+/* =====================================================================
+   PHYSICS
+   ===================================================================== */
+function lineCircle(ax, ay, bx, by, e) {
+  const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+  const t = clamp(((ball.x - ax) * dx + (ball.y - ay) * dy) / L2, 0, 1);
+  const cx = ax + dx * t, cy = ay + dy * t;
+  let nx = ball.x - cx, ny = ball.y - cy;
+  const d2 = nx * nx + ny * ny, r = ball.r;
+  if (d2 >= r * r) return false;
+  const d = Math.sqrt(d2) || 0.0001;
+  nx /= d; ny /= d;
+  ball.x = cx + nx * r; ball.y = cy + ny * r;
+  const vn = ball.vx * nx + ball.vy * ny;
+  if (vn < 0) { ball.vx -= (1 + e) * vn * nx; ball.vy -= (1 + e) * vn * ny; }
+  return true;
+}
+function bumpAt(cx, cy, R) {
+  let nx = ball.x - cx, ny = ball.y - cy;
+  const d = Math.hypot(nx, ny), m = R + ball.r;
+  if (d >= m) return false;
+  nx /= d || 1; ny /= d || 1;
+  ball.x = cx + nx * m; ball.y = cy + ny * m;
+  const vn = ball.vx * nx + ball.vy * ny;
+  if (vn < 0) { ball.vx -= (1 + BUMPER_E) * vn * nx; ball.vy -= (1 + BUMPER_E) * vn * ny; }
+  const out = ball.vx * nx + ball.vy * ny;
+  if (out < 8) { ball.vx += nx * (8 - out); ball.vy += ny * (8 - out); }
+  return true;
+}
+function closestOnSeg(ax, ay, bx, by, px, py) {
+  const dx = bx - ax, dy = by - ay;
+  const t = clamp(((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy), 0, 1);
+  return [ax + dx * t, ay + dy * t];
+}
+function inPoly(x, y, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function physicsChute(dt) {
+  const n = 4, sf = dt * 60 / n;
+  for (let s = 0; s < n; s++) {
+    ball.vy += GRAVITY * sf;
+    ball.x += ball.vx * sf; ball.y += ball.vy * sf;
+    ball.x += (660 - ball.x) * 0.15;
+    if (ball.x < 645) { ball.x = 645; ball.vx = Math.abs(ball.vx) * 0.5; }
+    if (ball.x > 675) { ball.x = 675; ball.vx = -Math.abs(ball.vx) * 0.5; }
+    if (ball.y > 455) { ball.y = 455; ball.vy = -22; } // failsafe re-launch
+    ball.esoD = ESO_BOTTOM - ball.y;
+    if (ball.y <= ESO_TOP || ball.vy > -3) {
+      S.phase = 'arch';
+      ball.pathD = Math.max(ESO_ARCH, ball.esoD);
+      ball.archSpeed = clamp(Math.abs(ball.vy), 9, 13);
+      return;
+    }
+  }
+}
+
+function physicsPlay(dt) {
+  const sdt = dt / SUB_STEPS, sf = sdt * 60;
+  for (let s = 0; s < SUB_STEPS; s++) {
+    // Flippers advance INSIDE the sub-step loop (no tunneling)
+    FL.step(sdt); FR.step(sdt);
+
+    ball.vy += GRAVITY * sf;
+    const sp = Math.hypot(ball.vx, ball.vy);
+    if (sp > MAX_SPEED) { ball.vx = ball.vx / sp * MAX_SPEED; ball.vy = ball.vy / sp * MAX_SPEED; }
+    ball.x += ball.vx * sf; ball.y += ball.vy * sf;
+
+    // Stomach walls
+    for (let i = 0; i < WALLS.length; i++) { const w = WALLS[i]; lineCircle(w[0], w[1], w[2], w[3], WALL_E); }
+    // One-way cardiac sphincter (only blocks from below)
+    if (ball.y > CARDIA[1]) lineCircle(CARDIA[0], CARDIA[1], CARDIA[2], CARDIA[3], 0.5);
+
+    // Organ bumpers
+    for (const o of ORGANS) {
+      for (const sh of o.shapes) {
+        let hit;
+        if (sh.t === 'c') hit = bumpAt(sh.x, sh.y, sh.r);
+        else { const cp = closestOnSeg(sh.ax, sh.ay, sh.bx, sh.by, ball.x, ball.y); hit = bumpAt(cp[0], cp[1], sh.r); }
+        if (hit) hitOrgan(o);
+      }
+    }
+
+    // Flippers
+    FL.collide(ball); FR.collide(ball);
+
+    // Gastric acid splash pads
+    for (const pd of PADS) {
+      if (pd.cd <= 0 && Math.hypot(ball.x - pd.x, ball.y - pd.y) < 30 + ball.r * 0.5) {
+        pd.cd = 0.7; pd.flash = 0.35;
+        ball.vx = pd.side * 6.5; ball.vy = -12.5;
+        addDigestion(10);
+        Sound.bubbles();
+        emit(pd.x, pd.y, 14, { type: 'bubble', colors: ['#C5E86C', '#E6F9A6', '#FFFFFF'], speed: 3, size: 4.5 });
+        callout('Stomach acid melts food! +10%', pd.x + pd.side * 90, pd.y - 50, '#EEF9D2');
+      }
+    }
+
+    // Pyloric gate
+    if (ball.y > GATE_Y - ball.r - 3 && ball.x > 262 && ball.x < 378) {
+      if (!S.gateOpen) {
+        ball.y = GATE_Y - ball.r - 4;
+        ball.vy = -14.5;
+        ball.vx = (Math.random() - 0.5) * 6;
+        Sound.bounceBack();
+        emit(ball.x, GATE_Y - 6, 12, { colors: ['#D85A6C', '#F4A2B8', '#FFFFFF'], speed: 4, size: 4, angle: -Math.PI / 2, spread: 1.6 });
+        if (S.gateCD <= 0) { callout('Keep churning! Need 100% Digestion!', 320, 630, '#FDE0E4'); S.gateCD = 1.2; }
+      } else {
+        startSmallIntestine();
+        return;
+      }
+    }
+
+    // Strict clamping: center must stay inside the stomach
+    if (inPoly(ball.x, ball.y, POLY)) { safe.x = ball.x; safe.y = ball.y; }
+    else { ball.x = safe.x; ball.y = safe.y; ball.vx *= -0.6; ball.vy *= -0.6; }
+  }
+
+  // Anti-stuck watchdog
+  if (Math.hypot(ball.vx, ball.vy) < 0.35) {
+    S.stuck += dt;
+    if (S.stuck > 1.4) {
+      S.stuck = 0;
+      ball.vx = rand(-3, 3); ball.vy = -8;
+      Sound.bubbles();
+      callout('Tummy rumble! Gurgle!', ball.x, ball.y - 40, '#FDE3DA');
+    }
+  } else S.stuck = 0;
+}
+
+/* =====================================================================
+   INPUT (keyboard, pointer and buttons tracked separately)
+   ===================================================================== */
+const keys = { left: false, right: false, space: false };
+const btn = { left: false, right: false };
+const ptrs = new Map(); // pointerId -> 'L' | 'R'
+const ptrHas = side => { for (const v of ptrs.values()) if (v === side) return true; return false; };
+
+const canvas = $('game');
+const ctx = canvas.getContext('2d');
+const btnL = $('btnL'), btnR = $('btnR'), btnEat = $('btnEat');
+
+window.addEventListener('keydown', e => {
+  const k = e.code;
+  if (k === 'ArrowLeft' || k === 'KeyA') { keys.left = true; btnL.classList.add('on'); e.preventDefault(); }
+  else if (k === 'ArrowRight' || k === 'KeyD') { keys.right = true; btnR.classList.add('on'); e.preventDefault(); }
+  else if (k === 'Space' || k === 'ArrowDown' || k === 'KeyS') {
+    e.preventDefault();
+    if (!e.repeat) { keys.space = true; btnEat.classList.add('on'); triggerEat(); }
+  }
+});
+window.addEventListener('keyup', e => {
+  const k = e.code;
+  if (k === 'ArrowLeft' || k === 'KeyA') { keys.left = false; btnL.classList.remove('on'); }
+  else if (k === 'ArrowRight' || k === 'KeyD') { keys.right = false; btnR.classList.remove('on'); }
+  else if (k === 'Space' || k === 'ArrowDown' || k === 'KeyS') {
+    e.preventDefault();
+    keys.space = false; btnEat.classList.remove('on');
+    triggerEat(); // releasing also works (no-op if already eating / in play)
+  }
+});
+window.addEventListener('blur', () => {
+  keys.left = keys.right = keys.space = false;
+  btnL.classList.remove('on'); btnR.classList.remove('on'); btnEat.classList.remove('on');
+});
+
+function canvasPoint(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+}
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  Sound.init();
+  if (S.phase === 'ready') { triggerEat(); return; }   // tapping food, mouth or anywhere eats
+  if (S.phase === 'eating') return;
+  const p = canvasPoint(e);
+  ptrs.set(e.pointerId, p.x < W / 2 ? 'L' : 'R');
+  try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+});
+const endPtr = e => { ptrs.delete(e.pointerId); };
+canvas.addEventListener('pointerup', endPtr);
+canvas.addEventListener('pointercancel', endPtr);
+canvas.addEventListener('lostpointercapture', endPtr);
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+function holdButton(el, on, off) {
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault(); Sound.init();
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    el.classList.add('on'); on();
+  });
+  const end = () => { el.classList.remove('on'); off(); };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  el.addEventListener('lostpointercapture', end);
+  el.addEventListener('contextmenu', e => e.preventDefault());
+}
+holdButton(btnL, () => { btn.left = true; }, () => { btn.left = false; });
+holdButton(btnR, () => { btn.right = true; }, () => { btn.right = false; });
+holdButton(btnEat, () => triggerEat(), () => {});
+
+/* =====================================================================
+   UPDATE
+   ===================================================================== */
+function update(dt) {
+  const f = dt * 60;
+  S.time += dt;
+
+  FL.setPressed(keys.left || btn.left || ptrHas('L'));
+  FR.setPressed(keys.right || btn.right || ptrHas('R'));
+
+  switch (S.phase) {
+    case 'eating': {
+      S.eatT += dt;
+      const closes = [0.2, 0.36, 0.52];
+      while (S.chew < 3 && S.eatT >= closes[S.chew]) {
+        S.chew++;
+        Sound.chomp();
+        emit(205, 82, 7, { colors: CRUMBS[S.food], speed: 2.8, size: 3.5 });
+        if (S.chew === 1) callout('Chomp! Teeth chew food into a soft Bolus!', 330, 205, '#FDE3DA');
+      }
+      if (S.eatT >= 0.6) launch();
+      break;
+    }
+    case 'chute':
+      physicsChute(dt);
+      break;
+    case 'arch': {
+      ball.pathD += ball.archSpeed * f;
+      const p = pathAt(ESO, ball.pathD);
+      ball.x = p.x; ball.y = p.y; ball.esoD = ball.pathD;
+      if (ball.pathD >= ESO.len) enterStomach();
+      break;
+    }
+    case 'play':
+      physicsPlay(dt);
+      break;
+    case 'si': {
+      ball.pathD += 3.4 * f;
+      const p = pathAt(SI, ball.pathD);
+      ball.x = p.x; ball.y = p.y;
+      STARS.forEach((s, i) => {
+        if (!s.got && ball.pathD >= s.d) {
+          s.got = true;
+          S.energy += 25; hudEnergy();
+          Sound.chime(i);
+          emit(s.x, s.y, 10, { type: 'star', colors: ['#FFE14D', '#FFF59D', '#FFB300'], speed: 3.5, size: 4.5 });
+          emitFly(s.x, s.y);
+          callout('+25 Energy! Vitamins absorbed!', s.x, s.y - 42, '#FFF8C4');
+        }
+      });
+      if (ball.pathD >= SI.len) {
+        S.phase = 'li'; ball.pathD = 0; S.dropT = 0;
+        setStage(5);
+        callout('Large intestine soaks up water!', 330, 700, '#E1F3FC');
+      }
+      break;
+    }
+    case 'li': {
+      ball.pathD += 4 * f;
+      const p = pathAt(LI, ball.pathD);
+      ball.x = p.x; ball.y = p.y;
+      S.dropT -= dt;
+      if (S.dropT <= 0) {
+        S.dropT = 0.09;
+        emit(ball.x, ball.y, 2, { type: 'drop', colors: ['#4FC3F7', '#81D4FA', '#29B6F6'], speed: 3, size: 4, gravity: 0.15 });
+        if (Math.random() < 0.35) Sound.drip();
+      }
+      if (ball.pathD >= LI.len) {
+        S.phase = 'jump'; S.jumpT = 0; S.jx = ball.x; S.jy = ball.y;
+        Sound.boing();
+        callout('Wheee! Off to the toilet!', 470, 870, '#E1F3FC');
+      }
+      break;
+    }
+    case 'jump': {
+      S.jumpT += dt / 0.9;
+      const t = Math.min(1, S.jumpT);
+      ball.x = lerp(S.jx, TOILET.x, t);
+      ball.y = lerp(S.jy, TOILET.y, t) - Math.sin(Math.PI * t) * 120;
+      ball.spin += 0.2 * f;
+      if (t >= 1) {
+        S.phase = 'flush'; S.flushT = 0;
+        setStage(6);
+        Sound.flush();
+        emit(TOILET.x, TOILET.y - 10, 70, { type: 'confetti', colors: ['#F4A2B8', '#FFE14D', '#A5D86B', '#81D4FA', '#E8997A', '#FFFFFF'], speed: 8, size: 5, angle: -Math.PI / 2, spread: 2.2, gravity: 0.1, decay: 0.008 });
+        emit(TOILET.x, TOILET.y, 20, { type: 'drop', colors: ['#4FC3F7', '#81D4FA'], speed: 5, size: 4, angle: -Math.PI / 2, spread: 1.6 });
+        callout('Flush! Bye-bye, waste!', 560, 860, '#E1F3FC');
+      }
+      break;
+    }
+    case 'flush':
+      S.flushT += dt;
+      ball.scale = Math.max(0, 1 - S.flushT / 0.8);
+      ball.spin += 0.35 * f;
+      if (S.flushT > 1.6 && !S.won) { S.won = true; S.phase = 'won'; showWin(); }
+      break;
+  }
+
+  if (S.phase !== 'play') { FL.step(dt); FR.step(dt); }
+
+  for (const o of ORGANS) { o.squash = Math.max(0, o.squash - dt); o.cd -= dt; }
+  for (const pd of PADS) { pd.cd -= dt; pd.flash = Math.max(0, pd.flash - dt); }
+  S.gateCD -= dt;
+
+  updateParticles(f);
+  updateCallouts(f);
+  btnEat.classList.toggle('dim', S.phase !== 'ready');
+}
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+function drawBackground(c) {
+  c.fillStyle = '#FCEEE9'; c.fillRect(0, 0, W, H);
+  c.fillStyle = 'rgba(242,139,130,0.07)';
+  for (let y = 20, row = 0; y < H; y += 60, row++) for (let x = (row % 2) * 30 + 15; x < W; x += 60) { circ(c, x, y, 6); c.fill(); }
+  const torso = new Path2D(); torso.roundRect(18, 14, 684, 994, 120);
+  c.fillStyle = 'rgba(246,214,202,0.65)'; c.fill(torso);
+}
+
+function drawLargeIntestine(c) {
+  c.save();
+  c.fillStyle = INK; for (const p of LI_POUCHES) { circ(c, p.x, p.y, 29.5); c.fill(); }
+  c.fillStyle = '#C98466'; for (const p of LI_POUCHES) { circ(c, p.x, p.y, 25); c.fill(); }
+  c.fillStyle = '#E5A98C'; for (const p of LI_POUCHES) { circ(c, p.x - 2.5, p.y - 3.5, 21.5); c.fill(); }
+  // haustra creases
+  c.strokeStyle = '#C98466'; c.lineWidth = 3; c.lineCap = 'round';
+  for (let i = 0; i < LI_POUCHES.length - 1; i++) {
+    const a = LI_POUCHES[i], b = LI_POUCHES[i + 1];
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, ang = Math.atan2(b.y - a.y, b.x - a.x);
+    const nx = -Math.sin(ang), ny = Math.cos(ang);
+    c.beginPath(); c.moveTo(mx + nx * 17, my + ny * 17);
+    c.quadraticCurveTo(mx + Math.cos(ang) * 4, my + Math.sin(ang) * 4, mx - nx * 17, my - ny * 17); c.stroke();
+  }
+  c.fillStyle = 'rgba(255,255,255,0.6)';
+  LI_POUCHES.forEach((p, i) => { if (i % 2 === 0) { ell(c, p.x - 9, p.y - 11, 5, 2.4, -0.6); c.fill(); } });
+  gloss(c, 118, 812, 10, -1.3);
+  // rectum end ring
+  const end = LI.pts[LI.pts.length - 1];
+  const ring = new Path2D(); ring.ellipse(end[0] - 4, end[1], 8, 14, 0, 0, TAU);
+  c.fillStyle = '#B86B5A'; c.fill(ring); outline(c, ring, 3);
+  face(c, 440, 758, 1.15, { open: S.phase === 'li' });
+  c.restore();
+}
+
+function drawSmallIntestine(c) {
+  c.save();
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  c.strokeStyle = INK; c.lineWidth = 42; c.stroke(siP);
+  c.strokeStyle = '#DE7F9A'; c.lineWidth = 33; c.stroke(siP);
+  c.save(); c.translate(-2, -3); c.strokeStyle = '#F4A2B8'; c.lineWidth = 25; c.stroke(siP); c.restore();
+  c.save(); c.translate(-6, -8); c.strokeStyle = 'rgba(255,255,255,0.55)'; c.lineWidth = 3.5; c.setLineDash([22, 16]); c.stroke(siP); c.restore();
+  // waving villi fingers along the inner walls
+  c.lineWidth = 3.5; c.strokeStyle = '#FFD3DE';
+  for (let d = 95; d < SI.len - 15; d += 14) {
+    const p = pathAt(SI, d);
+    const nx = -Math.sin(p.a), ny = Math.cos(p.a), tx = Math.cos(p.a), ty = Math.sin(p.a);
+    const wave = Math.sin(S.time * 5 + d * 0.3) * 2.5;
+    for (const sd of [-1, 1]) {
+      const bx = p.x + nx * sd * 14, by = p.y + ny * sd * 14;
+      const ex = p.x + nx * sd * 8 + tx * wave, ey = p.y + ny * sd * 8 + ty * wave;
+      c.beginPath(); c.moveTo(bx, by); c.lineTo(ex, ey); c.stroke();
+    }
+  }
+  gloss(c, 242, 799, 8, -0.2);
+  face(c, 330, 852, 0.95, { open: S.phase === 'si' });
+  c.restore();
+}
+
+function drawStars(c) {
+  for (const s of STARS) {
+    if (s.got) continue;
+    const pulse = 1 + 0.12 * Math.sin(S.time * 5 + s.d);
+    c.save();
+    const g = c.createRadialGradient(s.x, s.y, 2, s.x, s.y, 24);
+    g.addColorStop(0, 'rgba(255,236,120,0.85)'); g.addColorStop(1, 'rgba(255,236,120,0)');
+    c.fillStyle = g; circ(c, s.x, s.y, 24); c.fill();
+    const p = starPath(s.x, s.y, 13 * pulse, 6 * pulse, S.time * 0.8);
+    c.fillStyle = '#FFE14D'; c.fill(p); outline(c, p, 3);
+    c.fillStyle = 'rgba(255,255,255,0.85)'; circ(c, s.x - 3, s.y - 4, 2.2); c.fill();
+    c.restore();
+  }
+}
+
+function drawToilet(c) {
+  const x = TOILET.x, y = TOILET.y;
+  c.save();
+  const tank = new Path2D(); tank.roundRect(x - 30, y - 58, 60, 40, 10);
+  shadeFill(c, tank, '#FFFFFF', '#D5DEE8', 5); outline(c, tank);
+  const handle = new Path2D(); handle.roundRect(x - 26, y - 52, 11, 5, 2.5);
+  c.fillStyle = '#B0BEC5'; c.fill(handle); outline(c, handle, 2);
+  face(c, x + 4, y - 38, 0.8, { open: S.phase === 'flush' || S.phase === 'jump' });
+  const base = new Path2D(); base.roundRect(x - 20, y + 38, 40, 18, 6);
+  shadeFill(c, base, '#FFFFFF', '#D5DEE8', 4); outline(c, base);
+  const bowl = new Path2D();
+  bowl.moveTo(x - 44, y);
+  bowl.bezierCurveTo(x - 42, y + 30, x - 22, y + 40, x - 16, y + 44);
+  bowl.lineTo(x + 16, y + 44);
+  bowl.bezierCurveTo(x + 22, y + 40, x + 42, y + 30, x + 44, y);
+  bowl.closePath();
+  shadeFill(c, bowl, '#FFFFFF', '#D5DEE8', 6); outline(c, bowl);
+  const rim = new Path2D(); rim.ellipse(x, y, 46, 14, 0, 0, TAU);
+  shadeFill(c, rim, '#FFFFFF', '#E3EAF1', 3); outline(c, rim);
+  const water = new Path2D(); water.ellipse(x, y + 1, 34, 8.5, 0, 0, TAU);
+  c.fillStyle = '#8FD3F4'; c.fill(water);
+  c.save(); c.clip(water);
+  c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = 2.5; c.lineCap = 'round';
+  const sp = S.phase === 'flush' ? S.time * 12 : S.time * 1.5;
+  for (let i = 0; i < 3; i++) { c.beginPath(); c.ellipse(x, y + 1, 10 + i * 8, 2.5 + i * 2, 0, sp + i, sp + i + 2); c.stroke(); }
+  c.restore();
+  outline(c, water, 2.5);
+  gloss(c, x - 30, y - 6, 6, -0.3);
+  c.restore();
+}
+
+function drawEsophagus(c) {
+  c.save();
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  c.strokeStyle = INK; c.lineWidth = 66; c.stroke(esoP);
+  c.strokeStyle = '#C96A55'; c.lineWidth = 57; c.stroke(esoP);
+  c.save(); c.translate(-4, -3); c.strokeStyle = '#E58B73'; c.lineWidth = 46; c.stroke(esoP); c.restore();
+  c.save(); c.translate(-13, -9); c.strokeStyle = 'rgba(255,255,255,0.55)'; c.lineWidth = 5; c.setLineDash([40, 18]); c.stroke(esoP); c.restore();
+  // peristalsis squeeze rings travelling toward the stomach
+  c.strokeStyle = 'rgba(150,60,45,0.55)'; c.lineWidth = 3.5;
+  const ph = (S.time * 60) % 42;
+  for (let d = ph; d < ESO.len - 10; d += 42) {
+    const p = pathAt(ESO, d), nx = -Math.sin(p.a), ny = Math.cos(p.a);
+    c.beginPath(); c.moveTo(p.x + nx * 24, p.y + ny * 24);
+    c.quadraticCurveTo(p.x + Math.cos(p.a) * 6, p.y + Math.sin(p.a) * 6, p.x - nx * 24, p.y - ny * 24); c.stroke();
+  }
+  if (S.phase === 'chute' || S.phase === 'arch') {
+    const p = pathAt(ESO, Math.max(0, ball.esoD - 24)), nx = -Math.sin(p.a), ny = Math.cos(p.a);
+    c.strokeStyle = '#A9503D'; c.lineWidth = 7;
+    c.beginPath(); c.moveTo(p.x + nx * 27, p.y + ny * 27); c.lineTo(p.x + nx * 15, p.y + ny * 15); c.stroke();
+    c.beginPath(); c.moveTo(p.x - nx * 27, p.y - ny * 27); c.lineTo(p.x - nx * 15, p.y - ny * 15); c.stroke();
+  }
+  gloss(c, 560, 46, 14, -0.15);
+  c.restore();
+}
+
+function drawStomach(c) {
+  shadeFill(c, stomachFill, '#E8997A', '#D47B5A', 18);
+  c.save();
+  c.clip(stomachFill);
+  c.strokeStyle = 'rgba(196,105,74,0.5)'; c.lineWidth = 4; c.lineCap = 'round';
+  const folds = [[100, 520, 140, 556, 196, 572], [440, 572, 492, 556, 528, 516], [250, 640, 320, 658, 392, 640], [478, 212, 522, 236, 546, 282], [94, 300, 120, 340, 118, 380]];
+  for (const [x1, y1, cx, cy, x2, y2] of folds) { c.beginPath(); c.moveTo(x1, y1); c.quadraticCurveTo(cx, cy, x2, y2); c.stroke(); }
+  c.restore();
+  gloss(c, 84, 340, 22, -1.25);
+  face(c, 320, 470, 2.6, { open: true });
+  outline(c, stomachLine);
+}
+
+function drawPads(c) {
+  for (const pd of PADS) {
+    c.save();
+    const sq = pd.flash > 0 ? 1 + 0.15 * Math.sin(pd.flash * 30) : 1;
+    c.translate(pd.x, pd.y); c.scale(sq, 1 / sq);
+    const p = new Path2D(); p.ellipse(0, 0, 32, 28, 0, 0, TAU);
+    shadeFill(c, p, '#C5E86C', '#93C23E', 7);
+    c.save(); c.clip(p);
+    c.strokeStyle = 'rgba(255,255,255,0.9)'; c.lineWidth = 2;
+    for (let i = 0; i < 5; i++) {
+      const ph = (S.time * 0.8 + i * 0.2) % 1;
+      circ(c, Math.sin(i * 2.1 + S.time * 2) * 14, 18 - ph * 38, 3 + (i % 2) * 1.5); c.stroke();
+    }
+    c.restore();
+    gloss(c, -14, -12, 7, -0.8);
+    face(c, 0, 5, 0.75, { open: pd.flash > 0 });
+    outline(c, p);
+    c.restore();
+  }
+}
+
+function drawOrgans(c) {
+  for (const o of ORGANS) {
+    c.save();
+    if (o.squash > 0) {
+      const k = o.squash / 0.3, w = Math.sin(k * Math.PI * 4) * 0.16 * k;
+      c.translate(o.cx, o.cy); c.scale(1 + w, 1 - w); c.translate(-o.cx, -o.cy);
+    }
+    shadeFill(c, o.path, o.base, o.shadow, 9);
+    gloss(c, o.gl.x, o.gl.y, o.gl.w, o.gl.rot);
+    c.save();
+    c.translate(o.face.x, o.face.y);
+    if (o.face.rot) c.rotate(o.face.rot);
+    face(c, 0, 0, o.face.s, { open: o.face.open || o.squash > 0, sleepy: o.face.sleepy && o.squash <= 0 });
+    c.restore();
+    outline(c, o.path);
+    c.restore();
+  }
+}
+
+function drawGate(c) {
+  c.save();
+  if (!S.gateOpen) {
+    const p = new Path2D(); p.roundRect(262, 699, 116, 19, 9.5);
+    shadeFill(c, p, '#D85A6C', '#AE3B4E', 4);
+    c.save(); c.clip(p);
+    c.strokeStyle = 'rgba(255,190,200,0.8)'; c.lineWidth = 2.5; c.lineCap = 'round';
+    for (let x = 272; x <= 370; x += 12) { c.beginPath(); c.moveTo(x, 701); c.lineTo(x - 4, 716); c.stroke(); }
+    c.restore();
+    outline(c, p, 3.5);
+    c.font = `bold 11px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.lineWidth = 3; c.strokeStyle = INK; c.strokeText('GATE CLOSED', 320, 709);
+    c.fillStyle = '#FFFFFF'; c.fillText('GATE CLOSED', 320, 709);
+  } else {
+    for (const x of [250, 368]) {
+      const p = new Path2D(); p.roundRect(x, 699, 22, 19, 9);
+      shadeFill(c, p, '#D85A6C', '#AE3B4E', 3); outline(c, p, 3.5);
+    }
+    const a = 0.5 + 0.5 * Math.sin(S.time * 10);
+    for (let k = 0; k < 3; k++) {
+      const yy = 700 + k * 15 + (S.time * 30) % 15;
+      const ch = new Path2D();
+      ch.moveTo(306, yy); ch.lineTo(320, yy + 10); ch.lineTo(334, yy); ch.lineTo(334, yy + 5); ch.lineTo(320, yy + 15); ch.lineTo(306, yy + 5); ch.closePath();
+      c.globalAlpha = 0.45 + 0.55 * a;
+      c.fillStyle = '#7BC74D'; c.fill(ch); outline(c, ch, 2);
+    }
+    c.globalAlpha = 1;
+  }
+  c.restore();
+}
+
+function drawMouth(c, x, y, openH, inner) {
+  c.save();
+  c.translate(x, y);
+  const lipRy = openH / 2 + 14, cavRy = Math.max(3, openH / 2 + 1);
+  c.fillStyle = 'rgba(242,139,130,0.85)';
+  ell(c, -82, 8, 10, 6); c.fill(); ell(c, 82, 8, 10, 6); c.fill();
+  const lips = new Path2D(); lips.ellipse(0, 0, 64, lipRy, 0, 0, TAU);
+  shadeFill(c, lips, '#EE7B83', '#C9545E', 6);
+  outline(c, lips);
+  const cav = new Path2D(); cav.ellipse(0, 0, 50, cavRy, 0, 0, TAU);
+  c.fillStyle = '#8D2323'; c.fill(cav);
+  c.save(); c.clip(cav);
+  c.fillStyle = '#FF8A80'; ell(c, 0, cavRy * 0.75, 30, cavRy * 0.5); c.fill();
+  if (inner) inner();
+  c.fillStyle = '#FFFFFF'; c.strokeStyle = INK; c.lineWidth = 2.5;
+  for (let i = -2; i <= 2; i++) { c.beginPath(); c.roundRect(i * 18 - 8, -cavRy - 6, 16, 17, 5); c.fill(); c.stroke(); }
+  for (let i = -1.5; i <= 1.5; i++) { c.beginPath(); c.roundRect(i * 18 - 8, cavRy - 11, 16, 17, 5); c.fill(); c.stroke(); }
+  c.restore();
+  outline(c, cav, 3.5);
+  gloss(c, -36, -lipRy + 7, 9, -0.25);
+  c.restore();
+}
+
+function drawMouthArea(c) {
+  // food plate (hopper)
+  const plate = new Path2D(); plate.ellipse(80, 104, 46, 12, 0, 0, TAU);
+  shadeFill(c, plate, '#FFFFFF', '#BFE3F2', 4); outline(c, plate);
+  const MX = 205, MY = 82;
+  let openH = 16 + Math.sin(S.time * 2.2) * 4;
+  let inner = null, flying = null;
+  if (S.phase === 'ready' || S.phase === 'select') {
+    openH = 16 + 18 * Math.max(0, Math.sin(S.time * 3));
+    drawFood(c, S.food, 80, 72 + Math.sin(S.time * 3) * 3, 24, { open: Math.sin(S.time * 2) > 0.5 });
+  } else if (S.phase === 'eating') {
+    const t = S.eatT;
+    if (t < 0.12) {
+      openH = 40;
+      const k = t / 0.12;
+      flying = { x: lerp(80, MX, k), y: lerp(72, MY, k) - Math.sin(Math.PI * k) * 30 };
+    } else {
+      openH = 6 + 34 * (0.5 + 0.5 * Math.cos(TAU * (t - 0.12) / 0.16));
+      inner = () => {
+        if (S.chew >= 3) drawBolus(c, 0, 0, 15, BOLUS[S.food], { open: true });
+        else drawFood(c, S.food, 0, 0, 20 * (1 - 0.1 * S.chew), { open: true });
+      };
+    }
+  }
+  drawMouth(c, MX, MY, openH, inner);
+  if (flying) drawFood(c, S.food, flying.x, flying.y, 22, { open: true });
+}
+
+function drawBall(c) {
+  const ph = S.phase;
+  if (!['chute', 'arch', 'play', 'si', 'li', 'jump', 'flush'].includes(ph)) return;
+  const base = BOLUS[S.food];
+  let col, waste = false;
+  if (ph === 'chute' || ph === 'arch') col = base;
+  else if (ph === 'play') col = mix(base, GOLD, S.dig / 100);
+  else if (ph === 'si') col = GOLD;
+  else if (ph === 'li') { const k = clamp(ball.pathD / LI.len * 1.3, 0, 1); col = mix(GOLD, BROWN, k); waste = k > 0.7; }
+  else { col = BROWN; waste = true; }
+  const r = ball.r * ball.scale;
+  if (r <= 0.5) return;
+  c.save();
+  if (S.gateOpen && (ph === 'play' || ph === 'si')) {
+    const g = c.createRadialGradient(ball.x, ball.y, r * 0.5, ball.x, ball.y, r * 2.4);
+    g.addColorStop(0, 'rgba(255,214,80,0.75)'); g.addColorStop(1, 'rgba(255,214,80,0)');
+    c.fillStyle = g; circ(c, ball.x, ball.y, r * 2.4); c.fill();
+  }
+  if (ph === 'flush') { c.translate(ball.x, ball.y); c.rotate(ball.spin); c.translate(-ball.x, -ball.y); }
+  drawBolus(c, ball.x, ball.y, r, col, { waste, open: ph === 'jump' || ph === 'chute', wob: S.time * 4 });
+  c.restore();
+}
+
+function drawPrompt(c) {
+  const s = 1 + 0.05 * Math.sin(S.time * 5);
+  c.save();
+  c.translate(330, 400); c.scale(s, s);
+  c.font = `bold 20px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  const t1 = 'Tap or press SPACE to EAT!';
+  const w = c.measureText(t1).width + 34;
+  const p = new Path2D(); p.roundRect(-w / 2, -24, w, 48, 24);
+  c.fillStyle = '#FFF3C4'; c.fill(p); outline(c, p, 4);
+  c.fillStyle = INK; c.fillText(t1, 0, 1);
+  c.restore();
+}
+
+function render() {
+  ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  drawBackground(ctx);
+  drawLargeIntestine(ctx);
+  drawSmallIntestine(ctx);
+  drawStars(ctx);
+  drawToilet(ctx);
+  drawEsophagus(ctx);
+  drawStomach(ctx);
+  drawPads(ctx);
+  drawOrgans(ctx);
+  drawGate(ctx);
+  FL.draw(ctx);
+  FR.draw(ctx);
+  for (const [t, x, y, r] of LABELS) label(ctx, t, x, y, r);
+  drawMouthArea(ctx);
+  drawBall(ctx);
+  drawParticles(ctx);
+  drawCallouts(ctx);
+  if (S.phase === 'ready') drawPrompt(ctx);
+}
+
+/* =====================================================================
+   LAYOUT / RESIZE (canvas keeps 720x1020 aspect, crisp on HiDPI)
+   ===================================================================== */
+const wrap = $('stageWrap');
+function resize() {
+  const r = wrap.getBoundingClientRect();
+  const k = Math.min(r.width / W, r.height / H);
+  const cw = Math.max(50, Math.floor(W * k)), ch = Math.max(70, Math.floor(H * k));
+  canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
+}
+window.addEventListener('resize', resize);
+
+/* =====================================================================
+   MENUS
+   ===================================================================== */
+function drawFoodCards() {
+  for (const type of ['apple', 'broccoli', 'cheese']) {
+    const cv = $('fc-' + type), c = cv.getContext('2d');
+    c.clearRect(0, 0, cv.width, cv.height);
+    c.save(); c.scale(cv.width / 84, cv.height / 84);
+    drawFood(c, type, 42, 46, 26, { open: true });
+    c.restore();
+  }
+}
+document.querySelectorAll('.food').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.food').forEach(x => x.classList.remove('sel'));
+    card.classList.add('sel');
+    S.food = card.dataset.food;
+    Sound.pop(600);
+  });
+});
+$('startBtn').addEventListener('click', () => {
+  Sound.init();
+  $('selectModal').classList.remove('show');
+  resetGame(S.food);
+  $('startBtn').blur();
+});
+$('againBtn').addEventListener('click', () => {
+  $('winModal').classList.remove('show');
+  $('selectModal').classList.add('show');
+  S.phase = 'select';
+  $('againBtn').blur();
+});
+$('helpBtn').addEventListener('click', () => $('helpModal').classList.add('show'));
+$('helpClose').addEventListener('click', () => $('helpModal').classList.remove('show'));
+$('soundBtn').addEventListener('click', () => {
+  Sound.muted = !Sound.muted;
+  $('soundBtn').style.opacity = Sound.muted ? 0.4 : 1;
+  $('soundBtn').blur();
+});
+
+/* =====================================================================
+   MAIN LOOP
+   ===================================================================== */
+drawFoodCards();
+resetGame('apple');
+S.phase = 'select';
+resize();
+let last = performance.now();
+function frame(now) {
+  let dt = (now - last) / 1000;
+  last = now;
+  if (dt > 0.05) dt = 0.05;
+  if (dt > 0) update(dt);
+  render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>
